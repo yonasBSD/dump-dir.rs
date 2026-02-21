@@ -1,0 +1,97 @@
+name: Security Audit
+
+on:
+  workflow_run:
+    workflows: ["Test with Code Coverage"]
+    types:
+      - completed
+
+jobs:
+  # The Gatekeeper: Central check for upstream success
+  gatekeeper:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - run: echo "Upstream tests passed. Proceeding with security audits..."
+
+  secrets:
+    name: Secrets
+    needs: gatekeeper
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install dependencies
+        run: |
+          curl --proto '=https' --tlsv1.3 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d && sudo mv bin/task /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Trufflehog
+        run: task audit:secrets
+
+  vulnerabilities:
+    name: Vulnerabilities
+    needs: gatekeeper
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Install dependencies
+        run: |
+          curl --proto '=https' --tlsv1.3 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d && sudo mv bin/task /usr/local/bin/
+          export trivy_ver=$(curl -sL https://api.github.com/repos/aquasecurity/trivy/releases/latest | jq -r ".tag_name" | cut -d'v' -f2)
+          wget "https://github.com/aquasecurity/trivy/releases/download/v${trivy_ver}/trivy_${trivy_ver}_Linux-64bit.deb"
+          wget "https://github.com/aquasecurity/trivy/releases/download/v${trivy_ver}/trivy_${trivy_ver}_Linux-64bit.deb.sigstore.json"
+          cosign verify-blob trivy_${trivy_ver}_Linux-64bit.deb \
+            --bundle trivy_${trivy_ver}_Linux-64bit.deb.sigstore.json \
+            --certificate-identity-regexp 'https://github\.com/aquasecurity/trivy/\.github/workflows/.+' \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          sudo dpkg -i trivy_${trivy_ver}_Linux-64bit.deb
+
+      - name: Run Trivy
+        run: task audit:vulnerabilities
+
+  advisories:
+    name: Advisories
+    needs: gatekeeper
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            api.scorecard.dev:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            www.bestpractices.dev:443
+            objects.githubusercontent.com:443
+            static.rust-lang.org:443
+            static.crates.io:443
+            index.crates.io:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - name: Run advisories checklist
+        uses: yonasBSD/toolkit@e3156a095eb4a759778ad8ef10dfd58dd00993e6 # v1.0.0
+        with:
+          run: |
+            echo "### Advisories" > $GITHUB_STEP_SUMMARY
+            cargo deny check advisories >> $GITHUB_STEP_SUMMARY

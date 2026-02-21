@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "packages/cli",
+    "packages/api",
+    "packages/webui",
+    "packages/lib",
+    "packages/testing",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+description = "Dump a directory's file contents to terminal, respecting .gitignore"
+license = "MIT"
+repository = ""
+keywords = []
+categories = []
+
+[workspace.dependencies]
+anyhow = "1"
+clap = "4"

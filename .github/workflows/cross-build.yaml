@@ -1,0 +1,261 @@
+name: Cross Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Test with Code Coverage"]
+    branches: [main]
+    types:
+      - completed
+
+env:
+  FEATURE_PATH: ./
+
+jobs:
+  test:
+    name: ${{ matrix.os.name }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    strategy:
+      matrix:
+        os:
+          - arch: ubuntu-latest
+            name: Ubuntu
+        # - arch: macos-latest
+        #   name: Mac OS X
+        rust: [stable]
+    runs-on: ${{ matrix.os.arch }}
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            api.scorecard.dev:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            www.bestpractices.dev:443
+            objects.githubusercontent.com:443
+            github-releases.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            raw.githubusercontent.com:443
+            static.rust-lang.org:443
+            static.crates.io:443
+            index.crates.io:443
+            azure.archive.ubuntu.com:80
+            changelogs.ubuntu.com:443
+            esm.ubuntu.com:443
+            security.ubuntu.com:80
+            packages.microsoft.com:443
+
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      - name: Run cargo test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+
+  freebsd:
+    name: FreeBSD
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: FreeBSD
+        uses: vmactions/freebsd-vm@80bcb19d617fe71c9db00e6297b16fb184dac498 # v1.4.1
+        with:
+          usesh: true
+          sync: rsync
+          copyback: false
+          envs: GITHUB_TOKEN
+          prepare: |
+            pkg update -f ; pkg install -y curl rust-nightly
+          run: |
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+
+  alpine:
+    name: Alpine
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            api.scorecard.dev:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            www.bestpractices.dev:443
+            static.rust-lang.org:443
+            static.crates.io:443
+            index.crates.io:443
+            dl-cdn.alpinelinux.org:80
+            gitlab.alpinelinux.org:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            raw.githubusercontent.com:443
+
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup
+        uses: jirutka/setup-alpine@ae3b3ddba35054804fc4a3507b519fa7e8152050 # v1.4.1
+        with:
+          branch: edge
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          apk add cargo build-base pkgconfig xz-dev
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+        shell: alpine.sh --root {0}
+
+  arch:
+    name: Arch
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            api.scorecard.dev:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            www.bestpractices.dev:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            raw.githubusercontent.com:443
+            static.rust-lang.org:443
+            static.crates.io:443
+            index.crates.io:443
+            2.netbsd.pool.ntp.org:443
+            archlinux.org:443
+            geo.mirror.pkgbuild.com:443
+            openpgpkey.archlinux.org:443
+
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup
+        uses: RangHo/setup-arch@19885eda0c0b0d1791e61e1d32f2552d42944b14 # main
+        with:
+          packages: "rust"
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+
+  fedora:
+    name: Fedora
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    container: fedora:latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install dependencies
+        run: dnf install -y rust cargo gcc
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+
+  opensuse:
+    name: OpenSUSE
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    container: opensuse/tumbleweed
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install dependencies
+        run: zypper install -y rust cargo gcc
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features
+
+  gentoo:
+    name: Gentoo
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    container: gentoo/stage3
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Gentoo stage3 doesn't come with much; we use the binary rust for speed in CI
+          emerge --sync --quiet
+          emerge --ask n --verbose dev-lang/rust-bin
+          cd ${{ env.FEATURE_PATH }} && cargo test --all-features

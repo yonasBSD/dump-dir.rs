@@ -1,0 +1,28 @@
+---
+source: tests/snapshot_test.rs
+expression: decisions
+---
+- - src/main.rs
+  - false
+- - src/lib.rs
+  - false
+- - src/main_test.rs
+  - true
+- - Cargo.lock
+  - true
+- - Cargo.toml
+  - false
+- - ".env"
+  - true
+- - README.md
+  - true
+- - Makefile
+  - true
+- - ".github/workflows/ci.yml"
+  - true
+- - node_modules/lodash/index.js
+  - true
+- - target/debug/dump-dir
+  - false
+- - dist/app.min.js
+  - false

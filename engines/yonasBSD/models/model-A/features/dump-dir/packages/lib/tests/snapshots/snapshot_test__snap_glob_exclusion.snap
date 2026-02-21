@@ -1,0 +1,6 @@
+---
+source: tests/snapshot_test.rs
+expression: files
+---
+- src/main.rs
+- static/app.js

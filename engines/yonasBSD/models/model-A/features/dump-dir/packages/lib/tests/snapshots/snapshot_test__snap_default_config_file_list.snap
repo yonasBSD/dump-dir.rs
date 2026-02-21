@@ -1,0 +1,7 @@
+---
+source: tests/snapshot_test.rs
+expression: files
+---
+- Cargo.toml
+- src/lib.rs
+- src/main.rs

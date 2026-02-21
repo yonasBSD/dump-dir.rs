@@ -1,0 +1,8 @@
+# dump.toml — project-local config for dump-dir
+#
+# Place this file in any directory and run `dump-dir` from there.
+# These settings OVERRIDE the global ~/.config/dump-dir/config.toml.
+# Arrays replace rather than merge, so list everything you want.
+
+# Example: for a Rust project, also skip build artifacts and generated files
+#skip_globs = ["**/target", "**/src"]

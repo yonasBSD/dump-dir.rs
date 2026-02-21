@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_test.rs
+expression: cfg
+---
+skip_extensions = [
+    'snap',
+    'lock',
+    'new',
+    'gitignore',
+    'orig',
+    'bak',
+    'swp',
+]
+skip_patterns = ['.*test.*\.rs$']
+skip_filenames = [
+    'license',
+    'readme',
+    'changelog',
+    'makefile',
+    'dockerfile',
+]
+skip_path_components = [
+    '.github',
+    '.git',
+    'node_modules',
+    '.direnv',
+]
+skip_globs = []
+skip_binary = true
+skip_hidden = true

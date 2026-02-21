@@ -1,0 +1,58 @@
+[package]
+name = "dump-dir"
+version = "0.1.0"
+edition = "2024"
+description = "Dump a directory's file contents to terminal, respecting .gitignore"
+license = "MIT"
+
+[[bin]]
+name = "dump-dir"
+path = "src/main.rs"
+
+[lib]
+name = "dump_dir"
+path = "src/lib.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4", features = ["derive"] }
+
+# Layered config (global + local TOML)
+config = { version = "0.15", default-features = false, features = ["toml"] }
+
+# serde for deserializing config structs
+serde = { version = "1", features = ["derive"] }
+
+# git-aware file walking (respects .gitignore)
+ignore = "0.4"
+
+# Colored terminal output
+colored = "3"
+
+# MIME / binary detection
+infer = "0.19"
+
+# Regex for skip patterns
+regex = "1"
+
+# Glob patterns for skip rules
+globset = "0.4"
+
+# Error handling
+anyhow = "1"
+
+# Home directory resolution
+dirs = "6"
+
+[dev-dependencies]
+# Snapshot testing
+insta = { version = "1", features = ["toml", "yaml"] }
+
+# Temporary directories for integration/e2e tests
+tempfile = "3"
+
+# Run CLI as a subprocess for e2e tests
+assert_cmd = "2"
+
+# Fluent assertions on Command output
+predicates = "3"

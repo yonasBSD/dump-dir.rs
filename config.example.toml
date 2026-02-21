@@ -1,0 +1,27 @@
+# ~/.config/dump-dir/config.toml
+#
+# Global configuration for dump-dir.
+# These are the built-in defaults — uncomment and modify to override.
+
+# File extensions to skip (without leading dot)
+# skip_extensions = ["snap", "lock", "new", "gitignore", "orig", "bak", "swp"]
+
+# Glob patterns matched against the full file path (case-insensitive)
+# Supports **, *, ?, and character classes
+# skip_globs = ["**/target/**", "**/*.min.js", "dist/**"]
+
+# Regex patterns matched against the full file path (case-insensitive)
+# skip_patterns = [".*test.*\\.rs$"]
+
+# Exact filenames to skip (case-insensitive, matches stem or full name)
+# skip_filenames = ["license", "readme", "changelog", "makefile", "dockerfile"]
+
+# Path components — any file whose path contains one of these directory names
+# is skipped, regardless of depth
+# skip_path_components = [".github", ".git", "node_modules", ".direnv"]
+
+# Skip files detected as binary (true/false)
+# skip_binary = true
+
+# Skip hidden files and directories (any path component starting with '.')
+# skip_hidden = true

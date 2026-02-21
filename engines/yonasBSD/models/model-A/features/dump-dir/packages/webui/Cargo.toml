@@ -1,0 +1,16 @@
+[package]
+name = "webui"
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[lib]
+name = "webui"
+path = "src/lib.rs"
+
+[dependencies]
+lib = { path = "../lib" }

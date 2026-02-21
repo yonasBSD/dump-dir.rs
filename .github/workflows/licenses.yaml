@@ -1,0 +1,54 @@
+name: Licenses
+
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  deny-check:
+    name: License check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            api.scorecard.dev:443
+            fulcio.sigstore.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            www.bestpractices.dev:443
+            objects.githubusercontent.com:443
+            static.rust-lang.org:443
+            static.crates.io:443
+            index.crates.io:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: nightly
+
+      - name: Run cargo-deny
+        uses: yonasBSD/toolkit@e3156a095eb4a759778ad8ef10dfd58dd00993e6 # v1.0.0
+        with:
+          run: |
+            cargo-deny check licenses bans
+            echo "::group::List of licenses"
+            cargo-license --authors --do-not-bundle
+            echo "::endgroup::"
+            echo ### Licenses > $GITHUB_STEP_SUMMARY
+            cargo-license --authors --do-not-bundle >> $GITHUB_STEP_SUMMARY
