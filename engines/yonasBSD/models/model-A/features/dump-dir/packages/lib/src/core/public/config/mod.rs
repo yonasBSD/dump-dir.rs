@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
 use config::{Config as ConfigRs, File, FileFormat};
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+
+use crate::errors::{ConfigLoadSnafu, ConfigNotFoundSnafu, DumpResult};
 
 /// The resolved, merged configuration.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -12,7 +14,7 @@ pub struct AppConfig {
     /// File extensions to skip (without leading dot), e.g. ["snap", "lock"]
     pub skip_extensions: Vec<String>,
 
-    /// Filename patterns to skip (regex), e.g. [".*\\.test\\.rs$"]
+    /// Filename patterns to skip (regex), e.g. [".*\.test\.rs$"]
     pub skip_patterns: Vec<String>,
 
     /// Exact filenames to skip (case-insensitive), e.g. ["license", "makefile"]
@@ -44,10 +46,7 @@ impl Default for AppConfig {
                 "bak".into(),
                 "swp".into(),
             ],
-            skip_patterns: vec![
-                // Test files like foo.test.rs or test_foo.rs
-                r".*test.*\.rs$".into(),
-            ],
+            skip_patterns: vec![r".*test.*\.rs$".into()],
             skip_filenames: vec![
                 "license".into(),
                 "readme".into(),
@@ -74,7 +73,7 @@ impl Default for AppConfig {
 ///   3. Local config:   ./dump.toml  (or --config path)  (if it exists)
 ///
 /// Later layers override earlier ones. Arrays are replaced, not merged.
-pub fn load(local_override: Option<&Path>) -> Result<AppConfig> {
+pub fn load(local_override: Option<&Path>) -> DumpResult<AppConfig> {
     let mut builder = ConfigRs::builder();
 
     // --- Layer 1: Global config ---
@@ -101,16 +100,16 @@ pub fn load(local_override: Option<&Path>) -> Result<AppConfig> {
                 .required(false),
         );
     } else if local_override.is_some() {
-        // User explicitly passed --config but the file doesn't exist — that's an error
-        anyhow::bail!("Config file not found: {}", local_path.display());
+        // User explicitly passed --config but the file doesn't exist — typed error
+        return ConfigNotFoundSnafu {
+            path: local_path.display().to_string(),
+        }
+        .fail();
     }
 
-    let raw = builder.build().context("Failed to build configuration")?;
+    let raw = builder.build().context(ConfigLoadSnafu)?;
 
-    // Deserialize into AppConfig, falling back to Default for missing fields
-    let cfg: AppConfig = raw
-        .try_deserialize()
-        .context("Failed to deserialize configuration")?;
+    let cfg: AppConfig = raw.try_deserialize().context(ConfigLoadSnafu)?;
 
     Ok(cfg)
 }
@@ -190,23 +189,18 @@ mod tests {
         let nonexistent = dir.path().join("nope.toml");
         let result = load(Some(&nonexistent));
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Config file not found")
-        );
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Config file not found"));
+        // Verify it's the typed variant we expect
+        assert!(matches!(
+            err,
+            crate::errors::DumpError::ConfigNotFound { .. }
+        ));
     }
 
     #[test]
     fn missing_default_local_config_uses_defaults() {
-        // No dump.toml in cwd — should just return defaults without error.
-        // We pass None and rely on there being no dump.toml wherever tests run.
-        // If there happens to be one, this test is environment-dependent — skip
-        // by passing a temp path that doesn't exist as the override.
         let cfg = load(None);
-        // May succeed or fail depending on whether dump.toml exists locally.
-        // At minimum it shouldn't panic.
         drop(cfg);
     }
 
@@ -216,19 +210,19 @@ mod tests {
         write_toml(&dir, "bad.toml", "this is not [ valid toml !!!");
         let result = load(Some(&dir.path().join("bad.toml")));
         assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            crate::errors::DumpError::ConfigLoad { .. }
+        ));
     }
 
     #[test]
     fn partial_config_fills_missing_fields_from_defaults() {
-        // Only override one field; the rest should be default
         let dir = TempDir::new().unwrap();
         write_toml(&dir, "dump.toml", "skip_binary = false");
         let cfg = load(Some(&dir.path().join("dump.toml"))).unwrap();
-        // skip_binary overridden
         assert!(!cfg.skip_binary);
-        // skip_hidden should still be default (true)
         assert!(cfg.skip_hidden);
-        // skip_extensions should still have defaults
         assert!(!cfg.skip_extensions.is_empty());
     }
 }

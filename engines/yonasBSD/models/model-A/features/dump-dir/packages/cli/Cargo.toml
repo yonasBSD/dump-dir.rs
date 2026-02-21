@@ -8,28 +8,22 @@ repository = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
-[lib]
-name = "cli"
-path = "src/lib.rs"
-
 [[bin]]
 name = "dump-dir"
 path = "src/main.rs"
 
 [dependencies]
 lib = { path = "../lib" }
-anyhow = { workspace = true }
+
+# Error framework
+errors-lib = { git = "https://github.com/yonasBSD/errors.rs" }
 clap = { workspace = true }
+miette = { version = "7.6", features = ["fancy"] }
+color-eyre = "0.6"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
-# Snapshot testing
 insta = { version = "1", features = ["toml", "yaml"] }
-
-# Temporary directories for integration/e2e tests
 tempfile = "3"
-
-# Run CLI as a subprocess for e2e tests
 assert_cmd = "2"
-
-# Fluent assertions on Command output
 predicates = "3"

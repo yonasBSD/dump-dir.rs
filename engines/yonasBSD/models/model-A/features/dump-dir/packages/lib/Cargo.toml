@@ -13,6 +13,11 @@ name = "lib"
 path = "src/lib.rs"
 
 [dependencies]
+# Error framework
+errors-lib = { git = "https://github.com/yonasBSD/errors.rs" }
+snafu = { version = "0.8", features = ["rust_1_65"] }
+miette = { version = "7.6", features = ["fancy"] }
+
 # CLI argument parsing
 clap = { version = "4", features = ["derive"] }
 
@@ -36,9 +41,6 @@ regex = "1"
 
 # Glob patterns for skip rules
 globset = "0.4"
-
-# Error handling
-anyhow = "1"
 
 # Home directory resolution
 dirs = "6"

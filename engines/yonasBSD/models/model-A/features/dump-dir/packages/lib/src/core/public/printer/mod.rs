@@ -1,7 +1,9 @@
 use std::{fs, path::Path, process::Command};
 
-use anyhow::Result;
 use colored::Colorize;
+use snafu::ResultExt;
+
+use crate::errors::{DumpResult, IoSnafu};
 
 const SEPARATOR: &str = "====================================================";
 
@@ -20,8 +22,7 @@ impl Printer {
         }
     }
 
-    pub fn print_file(&mut self, path: &Path) -> Result<()> {
-        // Check readability before printing the header
+    pub fn print_file(&mut self, path: &Path) -> DumpResult<()> {
         if !is_readable(path) {
             eprintln!(
                 "Warning: cannot read '{}' (permission denied)",
@@ -31,19 +32,19 @@ impl Printer {
             return Ok(());
         }
 
-        // Print header
         println!("{}", SEPARATOR.bold().blue());
         println!("{}", format!(" FILE: {}", path.display()).bold().blue());
         println!("{}", SEPARATOR.bold().blue());
 
-        // Print content — prefer bat if available
         let lines = if bat_available() {
             print_with_bat(path)
         } else {
-            print_with_cat(path)
+            print_with_cat(path).context(IoSnafu {
+                path: path.display().to_string(),
+            })?
         };
 
-        println!(); // Blank line between files
+        println!();
 
         self.file_count += 1;
         if let Some(n) = lines {
@@ -73,18 +74,15 @@ impl Printer {
     }
 }
 
-/// Returns whether the file can be opened for reading.
 fn is_readable(path: &Path) -> bool {
     fs::File::open(path).is_ok()
 }
 
-/// Returns true if `bat` is on PATH.
 fn bat_available() -> bool {
     which_bat().is_some()
 }
 
 fn which_bat() -> Option<String> {
-    // Try "bat" then "batcat" (Debian/Ubuntu package name)
     for name in &["bat", "batcat"] {
         if Command::new("which")
             .arg(name)
@@ -98,7 +96,6 @@ fn which_bat() -> Option<String> {
     None
 }
 
-/// Print via bat with line numbers, colors, no pager. Returns line count if knowable.
 fn print_with_bat(path: &Path) -> Option<usize> {
     let bat = which_bat()?;
     let status = Command::new(&bat)
@@ -108,20 +105,16 @@ fn print_with_bat(path: &Path) -> Option<usize> {
         .ok()?;
 
     if !status.success() {
-        // bat failed (e.g. unsupported file) — fall back to cat
-        print_with_cat(path)
+        print_with_cat(path).ok()?
     } else {
-        // We don't capture bat's output (it streams to stdout), so
-        // count lines ourselves for the summary
         count_lines(path)
     }
 }
 
-/// Print via plain cat. Returns line count.
-fn print_with_cat(path: &Path) -> Option<usize> {
-    let content = fs::read_to_string(path).ok()?;
+fn print_with_cat(path: &Path) -> std::io::Result<Option<usize>> {
+    let content = fs::read_to_string(path)?;
     print!("{content}");
-    Some(content.lines().count())
+    Ok(Some(content.lines().count()))
 }
 
 fn count_lines(path: &Path) -> Option<usize> {

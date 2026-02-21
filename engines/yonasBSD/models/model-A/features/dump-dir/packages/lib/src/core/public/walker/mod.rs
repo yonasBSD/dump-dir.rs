@@ -3,22 +3,18 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Result;
 use ignore::{DirEntry, WalkBuilder};
+use snafu::ResultExt;
 
-use crate::filter::Filter;
+use crate::{
+    errors::{DumpResult, WalkSnafu},
+    filter::Filter,
+};
 
 /// Collect all files under `root` that pass the filter, in sorted order.
-/// Uses the `ignore` crate which natively understands `.gitignore`, `.ignore`,
-/// global git excludes, and git's sparse-checkout — automatically doing the
-/// right thing whether or not we're inside a git repo.
-///
-/// Takes `Arc<Filter>` because `WalkBuilder::filter_entry` requires a `'static`
-/// closure, so the filter must be owned (not borrowed) inside it.
-pub fn collect_files(root: &Path, filter: Arc<Filter>) -> Result<Vec<PathBuf>> {
+pub fn collect_files(root: &Path, filter: Arc<Filter>) -> DumpResult<Vec<PathBuf>> {
     let mut files: Vec<PathBuf> = Vec::new();
 
-    // Clone the Arc for the filter_entry closure, which must be 'static + Send
     let filter_dir = Arc::clone(&filter);
 
     let walker = WalkBuilder::new(root)
@@ -28,10 +24,8 @@ pub fn collect_files(root: &Path, filter: Arc<Filter>) -> Result<Vec<PathBuf>> {
         .hidden(false)
         .follow_links(false)
         .sort_by_file_name(|a, b| a.cmp(b))
-        // Prune entire directories early — much faster than filtering per-file.
         .filter_entry(move |entry: &DirEntry| {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                // Never prune the root entry itself (depth 0), only subdirectories
                 if entry.depth() == 0 {
                     return true;
                 }
@@ -53,7 +47,13 @@ pub fn collect_files(root: &Path, filter: Arc<Filter>) -> Result<Vec<PathBuf>> {
                 }
             },
             Err(e) => {
-                eprintln!("Warning: {e}");
+                // Log a warning for soft walk errors but don't abort.
+                // Only hard errors (e.g. permission denied on root) warrant propagation.
+                if e.io_error().map(|io| io.kind()) == Some(std::io::ErrorKind::PermissionDenied) {
+                    eprintln!("Warning: {e}");
+                } else {
+                    return Err(e).context(WalkSnafu);
+                }
             },
         }
     }
